@@ -60,6 +60,12 @@ import requests
 import time
 from itertools import groupby
 
+# Python 3 vs 2
+try:
+    from urllib.error import HTTPError
+except:
+    from urllib2 import HTTPError
+
 __version__ = '0.6.0'
 
 IMG_FILTER = re.compile(r'.+\.(jpg|png|jpeg|tif|tiff|gif)$', re.IGNORECASE)
@@ -92,7 +98,14 @@ class SmugLine(object):
             return ALL_FILTER
 
     def upload_file(self, album, image):
-        self.smugmug.images_upload(AlbumID=album['id'], **image)
+        retries = 5
+        while retries:
+            try:
+                self.smugmug.images_upload(AlbumID=album['id'], **image)
+                return
+            except HTTPError:
+                print("retry ", image)
+                retries -= 1
 
     # source: http://stackoverflow.com/a/16696317/305019
     def download_file(self, url, folder, filename=None):
@@ -160,6 +173,9 @@ class SmugLine(object):
     def _download(self, images, dest_folder):
         for img in images:
             print('downloading {0} -> {1}'.format(img['FileName'], dest_folder))
+            if 'OriginalURL' not in img:
+                print('no permission to download {0}...skipping'.format(img['FileName']))
+                continue
             filename = self.download_file(img['OriginalURL'], dest_folder, img['FileName'])
             self.set_file_timestamp(filename, img)
 
@@ -219,7 +235,7 @@ class SmugLine(object):
         print('available albums:')
         for album in self.get_albums()['Albums']:
             if album['Title']:
-                print(album['Title'])
+                print(album['Title'].encode('utf-8'))
 
     def get_or_create_album(self, album_name):
         album = self.get_album_by_name(album_name)
