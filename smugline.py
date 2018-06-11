@@ -2,28 +2,28 @@
 """smugline - command line tool for SmugMug
 
 Usage:
-  smugline.py upload <album_name> --api-key=<apy_key>
+  smugline.py upload <album_name> --api-key=<api_key>
                                   [--from=folder_name]
                                   [--media=(videos | images | all)]
                                   [--email=email_address]
                                   [--password=password]
-  smugline.py download <album_name> --api-key=<apy_key>
+  smugline.py download <album_name> --api-key=<api_key>
                                     [--to=folder_name]
                                     [--media=(videos | images | all)]
                                     [--email=email_address]
                                     [--password=password]
-  smugline.py process <json_file> --api-key=<apy_key>
+  smugline.py process <json_file> --api-key=<api_key>
                                   [--from=folder_name]
                                   [--email=email_address]
                                   [--password=password]
-  smugline.py list --api-key=apy_key
+  smugline.py list [--api-key=api_key]
                    [--email=email_address]
                    [--password=password]
-  smugline.py create <album_name> --api-key=apy_key
+  smugline.py create <album_name> [--api-key=api_key]
                                   [--privacy=(unlisted | public)]
                                   [--email=email_address]
                                   [--password=password]
-  smugline.py clear_duplicates <album_name> --api-key=<apy_key>
+  smugline.py clear_duplicates <album_name> --api-key=<api_key>
                                             [--email=email_address]
                                             [--password=password]
   smugline.py (-h | --help)
@@ -44,7 +44,7 @@ Options:
   --privacy=(unlisted | public)
                           album privacy settings [default: unlisted]
   --email=email_address   email address of your smugmug account
-  --passwod=password      smugmug password
+  --password=password     smugmug password
 
 """
 
@@ -69,12 +69,15 @@ ALL_FILTER = re.compile('|'.join([IMG_FILTER.pattern, VIDEO_FILTER.pattern]),
 
 
 class SmugLine(object):
-    def __init__(self, api_key, email=None, password=None):
-        self.api_key = api_key
+    def __init__(self, api_key=None, email=None, password=None):
+        if api_key is None:
+            self.api_key = os.environ.get('SMUGMUG_API', None)
+        else:
+            self.api_key = api_key
         self.email = email
         self.password = password
         self.smugmug = SmugMug(
-            api_key=api_key,
+            api_key=self.api_key,
             api_version="1.2.2",
             app_name="SmugLine")
         self.login()
@@ -148,9 +151,11 @@ class SmugLine(object):
 
     def _upload(self, images, album_name, album):
         images = self._remove_duplicates(images, album)
+        print('uploading {0} images'.format(len(images)))
         for image in images:
-            print('uploading {0} -> {1}'.format(image, album_name))
+            print('      uploading {0} -> {1}'.format(image, album_name))
             self.upload_file(album, image)
+        print('Done uploading {0} images'.format(len(images)))
 
     def _download(self, images, dest_folder):
         for img in images:
@@ -267,7 +272,12 @@ class SmugLine(object):
             pass
 
         if self.email is None:
+            self.email = os.environ.get('SMUGMUG_EMAIL', None)
+        if self.email is None:
             self.email = input('Email address: ')
+
+        if self.password is None:
+            self.password = os.environ.get('SMUGMUG_PASSWORD', None)
         if self.password is None:
             self.password = getpass.getpass()
 
